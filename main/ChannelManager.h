@@ -9,7 +9,7 @@ namespace ChannelManager {
 
     struct ChannelConfig {
         bool enabled = false;
-        String source;              // serial1, serial2, custom1
+        String source;              // serial1, serial2, custom
         String protocol;            // "tcp", "mqtt"
         String target;              // IP地址
         uint16_t port = 0;

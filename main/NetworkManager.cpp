@@ -1,7 +1,9 @@
 #include "NetworkManager.h"
 #include "SerialManager.h"
 #include "ConfigManager.h"
-#include "CustomChannelAdapter.h"
+#include "NetManager.h"
+
+using namespace NetManager;
 
 namespace NetworkManager {
 
@@ -14,8 +16,6 @@ static int MAX_CHANNELS = 3;
 #define BUFFER_SIZE 1024
 // 等待接收数据的间隔 ms
 #define TASK_DELAY_MS 10
-
-
 
 // 内部函数声明
 static void printChannelStatus();
@@ -68,31 +68,24 @@ static void taskSerialToNetwork(void *parameter) {
 static void forwardToDestination(const String& destination, const uint8_t* data, size_t length) {
     if (destination == "serial1") {
         SerialManager::Serial1.write(data, length);
-        // 注意：这里的flush也已移除
         Serial.printf("[→Serial1] 转发 %d 字节\n", length);
     } else if (destination == "serial2") {
         SerialManager::Serial2.write(data, length);
         Serial.printf("[→Serial2] 转发 %d 字节\n", length);
-    } else if (destination.startsWith("custom")) {
-        CustomChannelAdapter::handleNetworkData(data, length);
-        Serial.printf("[→Custom] 转发 %d 字节\n", length);
     }
 }
 
-// 优化的网络数据转发任务（网络→串口/自定义通道）
+// 优化的网络数据转发任务（网络→串口）
 static void taskNetworkToSerial(void *parameter) {
-    Serial.println("[TASK] 网络到串口/自定义通道数据转发任务启动");
+    Serial.println("[TASK] 网络到串口数据转发任务启动");
 
     while (true) {
-
-        // 定期打印堆栈剩余空间（每分钟一次）
+        // 定期打印堆栈剩余空间
         static uint32_t lastStackCheck = 0;
-        if (millis() - lastStackCheck > 60000) {
-             Serial.printf("[TASK] %s 剩余堆栈: %u bytes\n", pcTaskGetName(NULL), uxTaskGetStackHighWaterMark(NULL));
+        if (millis() - lastStackCheck > 30000) {
+            Serial.printf("[TASK] %s 剩余堆栈: %u bytes\n", pcTaskGetName(NULL), uxTaskGetStackHighWaterMark(NULL));
             lastStackCheck = millis();
         }
-        vTaskDelay(pdMS_TO_TICKS(TASK_DELAY_MS));
-
 
         for (int i = 0; i < MAX_CHANNELS; i++) {
             ConfigManager::ChannelConfig& config = ConfigManager::deviceConfig.channels[i];
@@ -101,7 +94,7 @@ static void taskNetworkToSerial(void *parameter) {
                 continue;
             }
 
-            // TCP 数据接收 - 关键优化部分
+            // TCP 数据接收
             if (config.protocol == "tcp") {
                 WiFiClient& client = channels[i].wifiClient;
 
@@ -132,7 +125,7 @@ static void taskNetworkToSerial(void *parameter) {
     }
 }
 
-// 优化的MQTT回调函数（支持自定义通道）
+// 优化的MQTT回调函数
 static void mqttCallback(char* topic, byte* payload, unsigned int length) {
     Serial.printf("[MQTT] 收到主题 %s 的消息，长度: %d\n", topic, length);
 
@@ -176,7 +169,7 @@ void begin() {
 
     applyNetworkConfig();
 
-    // 创建任务 - 提高数据转发任务的优先级
+    // 创建任务
     xTaskCreatePinnedToCore(taskNetworkChannel, "NetworkChannel", 8192, NULL, 2, NULL, 1);
     xTaskCreatePinnedToCore(taskSerialToNetwork, "Serial1ToNet", 4096, (void*)1, 4, NULL, 1);
     xTaskCreatePinnedToCore(taskSerialToNetwork, "Serial2ToNet", 4096, (void*)2, 4, NULL, 1);
@@ -276,8 +269,6 @@ bool connectMQTT(int channelIndex) {
     Serial.printf("[MQTT-%s] 正在连接到 %s:%d\n",
                   config.source.c_str(), config.target.c_str(), config.port);
 
-    String clientId = config.clientID.isEmpty() ?
-        ("WT32-" + String(random(0xffff), HEX)) : config.clientID;
 
     bool success = channels[channelIndex].mqttClient->connect(
         clientId.c_str(),
@@ -537,7 +528,13 @@ bool sendToChannel(int channelIndex, const uint8_t* data, size_t length) {
     if (channelIndex < 0 || channelIndex >= MAX_CHANNELS) return false;
 
     ConfigManager::ChannelConfig& config = ConfigManager::deviceConfig.channels[channelIndex];
+
+    // 修正：使用正确的格式符打印协议字符串
+    Serial.printf("[通道 %d] 通过 %s 发送 %d 字节\n", channelIndex, config.protocol.c_str(), length);
+
     if (!config.enabled || channels[channelIndex].state != ConnectionState::CONNECTED) {
+        Serial.printf("[通道 %d] 不可用 - 启用: %d, 状态: %s\n",
+                     channelIndex, config.enabled, getChannelStatus(channelIndex).c_str());
         return false;
     }
 
@@ -548,21 +545,22 @@ bool sendToChannel(int channelIndex, const uint8_t* data, size_t length) {
         channels[channelIndex].wifiClient.flush(); // 立即发送
         success = (sent == length);
         if (success) {
-            Serial.printf("[通道 %d] 通过 TCP 发送 %d 字节\n", channelIndex, length);
+            Serial.printf("[通道 %d] 通过 TCP 发送 %d 字节成功\n", channelIndex, length);
         } else {
-            Serial.printf("[通道 %d] 通过 TCP 发送 %d 字节失败\n", channelIndex, length);
+            Serial.printf("[通道 %d] 通过 TCP 发送 %d 字节失败，仅发送 %d 字节\n",
+                         channelIndex, length, sent);
             channels[channelIndex].needsReconnect = true;
         }
     } else if (config.protocol == "mqtt" && channels[channelIndex].mqttClient != nullptr) {
-        String message;
-        message.concat((const char*)data, length);
         success = channels[channelIndex].mqttClient->publish(config.publishTopic.c_str(), data, length);
         if (success) {
-            Serial.printf("[通道 %d] 通过 MQTT 发送 %d 字节\n", channelIndex, length);
+            Serial.printf("[通道 %d] 通过 MQTT 发送 %d 字节成功\n", channelIndex, length);
         } else {
             Serial.printf("[通道 %d] 通过 MQTT 发送 %d 字节失败\n", channelIndex, length);
             channels[channelIndex].needsReconnect = true;
         }
+    } else {
+        Serial.printf("[通道 %d] 不支持的协议: %s\n", channelIndex, config.protocol.c_str());
     }
 
     return success;

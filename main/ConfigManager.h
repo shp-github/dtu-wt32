@@ -13,7 +13,7 @@ namespace ConfigManager {
         String protocol;
         String target;
         uint16_t port = 0;
-        String source;              // serial1, serial2, custom1
+        String source;              // serial1, serial2, custom
         int heartbeatTime = 30;
         String username;
         String password;

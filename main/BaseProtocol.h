@@ -12,7 +12,7 @@ namespace Protocol {
 
     struct ProtocolConfig {
         bool enabled = false;
-        String source;              // 数据来源 serial1, serial2, custom1
+        String source;              // 数据来源 serial1, serial2, custom
         ProtocolType protocol;      // 协议类型
         String target;              // 目标地址
         uint16_t port = 0;          // 端口

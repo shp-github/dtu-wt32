@@ -59,8 +59,7 @@ void updateFromJson(const JsonVariant &doc) {
                 Protocol::ProtocolConfig protoConfig;
                 protoConfig.enabled = config.enabled;
                 protoConfig.source = config.source;
-                protoConfig.protocol = (config.protocol == "tcp") ?
-                    Protocol::ProtocolType::TCP : Protocol::ProtocolType::MQTT;
+                protoConfig.protocol = (config.protocol == "tcp") ? Protocol::ProtocolType::TCP : Protocol::ProtocolType::MQTT;
                 protoConfig.target = config.target;
                 protoConfig.port = config.port;
                 protoConfig.heartbeatTime = config.heartbeatTime;

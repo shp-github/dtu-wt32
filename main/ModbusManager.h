@@ -94,6 +94,6 @@ namespace ModbusManager {
    * @return 是否读取成功
    * 根据功能码执行对应类型的寄存器读取
    */
-  bool executeModbusRead(const ModbusManager::Command &cmd, int maxRetries);
+  bool executeModbusRead(const ModbusManager::Command &cmd, int maxRetries = 3);
 
 }
