@@ -114,13 +114,9 @@ bool ModbusManager::executeModbusRead(const ModbusManager::Command &cmd, int max
 // 检查通道是否可用
 static bool isChannelAvailable(int channelId) {
     if (channelId == CHANNEL_MQTT) {
-        // 检查MQTT是否连接
         return true;
-    } else if (channelId >= CHANNEL_NET_1 && channelId <= CHANNEL_NET_3) {
-        // 检查NetworkManager通道状态
-        return NetworkManager::isChannelConnected(channelId);
     }
-    return false;
+    return NetworkManager::isChannelConnected(channelId-1);
 }
 
 // 发布数据到指定通道
@@ -168,7 +164,7 @@ static bool publishToChannel(int channelId, uint8_t slaveId, uint16_t regAddr, u
         case CHANNEL_NET_2:  // 通道2: 网络通道2
         case CHANNEL_NET_3:  // 通道3: 网络通道3
             Serial.printf("[MODBUS] 发送到网络通道%d: %s\n", channelId, payload.c_str());
-            success = NetworkManager::sendToChannel(channelId,
+            success = NetworkManager::sendToChannel(channelId - 1,
                                                    (const uint8_t*)payload.c_str(),
                                                    payload.length());
             break;
@@ -482,21 +478,21 @@ bool ModbusManager::writeCoilAndReport(uint8_t slaveId, uint16_t regAddr, int sd
             useChannel0 = true;
         }
 
-        // 发布到各通道
+        // 发布到通道
         if (useChannel0) {
             MqttManager::publish("/dev/coo/" + NetManager::clientId, payload);
         }
 
         if (useChannel1 && isChannelAvailable(CHANNEL_NET_1)) {
-            NetworkManager::sendToChannel(CHANNEL_NET_1, (const uint8_t*)payload.c_str(), payload.length());
+            NetworkManager::sendToChannel(CHANNEL_NET_1-1, (const uint8_t*)payload.c_str(), payload.length());
         }
 
         if (useChannel2 && isChannelAvailable(CHANNEL_NET_2)) {
-            NetworkManager::sendToChannel(CHANNEL_NET_2, (const uint8_t*)payload.c_str(), payload.length());
+            NetworkManager::sendToChannel(CHANNEL_NET_2-1, (const uint8_t*)payload.c_str(), payload.length());
         }
 
         if (useChannel3 && isChannelAvailable(CHANNEL_NET_3)) {
-            NetworkManager::sendToChannel(CHANNEL_NET_3, (const uint8_t*)payload.c_str(), payload.length());
+            NetworkManager::sendToChannel(CHANNEL_NET_3-1, (const uint8_t*)payload.c_str(), payload.length());
         }
 
         Serial.printf("[MODBUS] 写入并上报: 从机=%d, 线圈=%d, 值=%d\n",
@@ -560,15 +556,15 @@ void ModbusManager::handleMqttMessage(const String& message) {
             }
 
             if (useChannel1 && isChannelAvailable(CHANNEL_NET_1)) {
-                NetworkManager::sendToChannel(CHANNEL_NET_1, (const uint8_t*)payload.c_str(), payload.length());
+                NetworkManager::sendToChannel(CHANNEL_NET_1-1, (const uint8_t*)payload.c_str(), payload.length());
             }
 
             if (useChannel2 && isChannelAvailable(CHANNEL_NET_2)) {
-                NetworkManager::sendToChannel(CHANNEL_NET_2, (const uint8_t*)payload.c_str(), payload.length());
+                NetworkManager::sendToChannel(CHANNEL_NET_2-1, (const uint8_t*)payload.c_str(), payload.length());
             }
 
             if (useChannel3 && isChannelAvailable(CHANNEL_NET_3)) {
-                NetworkManager::sendToChannel(CHANNEL_NET_3, (const uint8_t*)payload.c_str(), payload.length());
+                NetworkManager::sendToChannel(CHANNEL_NET_3-1, (const uint8_t*)payload.c_str(), payload.length());
             }
 
             // 通知自动化模块
@@ -600,15 +596,15 @@ void ModbusManager::handleMqttMessage(const String& message) {
                 }
 
                 if (useChannel1 && isChannelAvailable(CHANNEL_NET_1)) {
-                    NetworkManager::sendToChannel(CHANNEL_NET_1, (const uint8_t*)payload.c_str(), payload.length());
+                    NetworkManager::sendToChannel(CHANNEL_NET_1-1, (const uint8_t*)payload.c_str(), payload.length());
                 }
 
                 if (useChannel2 && isChannelAvailable(CHANNEL_NET_2)) {
-                    NetworkManager::sendToChannel(CHANNEL_NET_2, (const uint8_t*)payload.c_str(), payload.length());
+                    NetworkManager::sendToChannel(CHANNEL_NET_2-1, (const uint8_t*)payload.c_str(), payload.length());
                 }
 
                 if (useChannel3 && isChannelAvailable(CHANNEL_NET_3)) {
-                    NetworkManager::sendToChannel(CHANNEL_NET_3, (const uint8_t*)payload.c_str(), payload.length());
+                    NetworkManager::sendToChannel(CHANNEL_NET_3-1, (const uint8_t*)payload.c_str(), payload.length());
                 }
 
                 // 通知自动化模块
