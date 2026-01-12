@@ -15,7 +15,7 @@ static const int DISCOVERY_PORT = 4210;
 static const int CONFIG_PORT    = 4211;
 
 /* 固件版本 */
-static const char* FIRMWARE_VERSION = "v1.0.6";
+static const char* FIRMWARE_VERSION = "v1.0.7";
 
 /* 是否打印日志 */
 static const bool ENABLE_LOG = true;
